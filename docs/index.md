@@ -51,23 +51,48 @@ toc: false
 
 
 ```js
+import {zoom} from 'npm:d3';
+
 let orig_data = await FileAttachment("./data/blood.json").json();
 const data = orig_data.map((d) => ({...d, date: new Date(d.date)}));
 // display(data);
 
 function bloodstocks(data, {width} = {}) {
-  return Plot.plot({
+  const xScale = d3.scaleTime()
+      .domain(d3.extent(data, d => d.date))
+      .range([0, width]);
+
+  const observablePlot = Plot.plot({
     title: "Singapore Blood Stock Amounts",
     width,
     height: 300,
     grid: true,
-    x: {label: "Date"},
+    x: {label: "Date", scale: xScale},
     y: {label: "Stock Percentage (%)"},
     color: {legend: true},
     marks: [
-        Plot.line(data, {x: "date", y: "fillLevel", stroke: "bloodType", tip: true}),
+      Plot.line(data, {x: "date", y: "fillLevel", stroke: "bloodType", tip: true}),
     ]
   });
+
+  // Create a new zoom behavior
+  const zoomBehavior = d3.zoom()
+    .scaleExtent([1, 10])  // Limit zoom level
+    .on("zoom", (event) => {
+      console.log("ZOOM!")
+      const transform = event.transform;
+      // Create new scales based on the event transform
+      const new_xScale = transform.rescaleX(xScale);
+      // Redraw your plot here using the new_xScale for the x-axis
+      // You might need to adjust this part based on how you can update your plot with the new scale
+      // Redraw the Observable Plot 
+      observablePlot.x({label: "Date", scale: new_xScale});
+    });
+
+  // Apply the zoom behavior to the SVG element
+  d3.select(observablePlot).call(zoomBehavior);
+
+  return observablePlot;
 }
 display(bloodstocks(data, {width}))
 ```
