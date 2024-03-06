@@ -1,55 +1,57 @@
 import {csvFormat, tsvParse} from "d3-dsv";
 import {utcParse} from "d3-time-format";
-
-// Read bloodstocks.json from https://github.com/frizensami/red-cross-blood-stocks, and get all the previous commits of this file too
-const bloodstocks_commits = JSON.parse(await (await fetch("https://api.github.com/repos/frizensami/red-cross-blood-stocks/commits?path=blood-stocks.json")).text());
-
-// This is paginated, so we need to get the rest
-// Get the rest of the commits
-// let page = 1;
-// while (bloodstocks_commits.length % 30 === 0) {
-//     console.error("Page: " + page + "Bloodstocks length: " + bloodstocks_commits.length)
-//     const next_commits = JSON.parse(await (await fetch("https://api.github.com/repos/frizensami/red-cross-blood-stocks/commits?path=blood-stocks.json&page=" + ++page)).text());
-//     if (next_commits.length === 0) {
-//         break;
-//     }
-//     bloodstocks_commits.push(...next_commits);
-// }
+import { Octokit } from "octokit";
 
 
-let all_stocks = []
-for (var i = 0; i < bloodstocks_commits.length; i++) {
-    const date = new Date(bloodstocks_commits[i].commit.author.date);
+const API_KEY = process.env.API_KEY_GENERAL;
+const octokit = new Octokit({ auth: API_KEY });
 
-    /**
-     * Current format of a single call looks like this
-    [
-        { bloodType: 'A+', status: 'Healthy', fillLevel: '80' },
-        { bloodType: 'A-', status: 'Low', fillLevel: '40' },
-        { bloodType: 'B+', status: 'Healthy', fillLevel: '73' },
-        { bloodType: 'B-', status: 'Moderate', fillLevel: '63' },
-        { bloodType: 'O+', status: 'Healthy', fillLevel: '100' },
-        { bloodType: 'O-', status: 'Healthy', fillLevel: '72' },
-        { bloodType: 'AB+', status: 'Healthy', fillLevel: '78' },
-        { bloodType: 'AB-', status: 'Moderate', fillLevel: '60' }
-    ]
+// console.log(API_KEY);
 
-     */
-    const bloodstock = JSON.parse(await (await fetch("https://raw.githubusercontent.com/frizensami/red-cross-blood-stocks/" + bloodstocks_commits[i].sha + "/blood-stocks.json")).text());
-    // console.log(bloodstock);
-
-    // Collapse our data into a single object
-    // const bloodstocks = [];
-    bloodstock.forEach((d) => {
-        all_stocks.push({date: date.toISOString().slice(0, 10), bloodType: d.bloodType, fillLevel: parseInt(d.fillLevel)});
-        // bloodstocks[d.bloodType] = parseInt(d.fillLevel);
-    });
+// const rate_limit = await octokit.rest.rateLimit.get();
+// console.log(rate_limit);
 
 
-    // const day_data = {date: date.toISOString().slice(0, 10), ...bloodstocks};
-    // all_stocks.push(day_data);
+// // Get the list of commits in the repo using Octokit
+const bloodstocks_commits = await octokit.paginate("GET /repos/{owner}/{repo}/commits", {
+// const bloodstocks_commits = await octokit.request("GET /repos/{owner}/{repo}/commits", {
+    owner: "frizensami",
+    repo: "red-cross-blood-stocks",
+});
+console.error("Received SHAs of " + bloodstocks_commits.length + " commits");
+
+// console.log(bloodstocks_commits);
+
+// // Get all the contents of blood-stocks.json file across all commits
+let all_stocks = [];
+// for (const commit of bloodstocks_commits.data) {
+let idx = 0;
+for (const commit of bloodstocks_commits) {
+    idx++;
+    const date = new Date(commit.commit.author.date);
+    try {
+        const bloodstocks = await octokit.rest.repos.getContent({
+            owner: "frizensami",
+            repo: "red-cross-blood-stocks",
+            path: "blood-stocks.json",
+            ref: commit.sha
+        });
+        const bloodstocks_data = JSON.parse(Buffer.from(bloodstocks.data.content, 'base64').toString('utf-8'));
+        bloodstocks_data.forEach((d) => {
+            all_stocks.push({date: date.toISOString().slice(0, 10), bloodType: d.bloodType, fillLevel: parseInt(d.fillLevel)});
+        });
+        console.error("Processed commit " + commit.sha + " at " + date.toISOString().slice(0, 10) + " with " + bloodstocks_data.length + " records" + " idx: " + idx + " of " + bloodstocks_commits.length);
+    } catch (e) {
+        // Ignore any errors and continue to the next commit
+        console.error(e);
+    }
 }
+
+// console.log(bloodstocks_data);
+
 
 // Write out csv formatted data.
 process.stdout.write(JSON.stringify(all_stocks));     
 // process.stdout.write("[{}]");     
+
+console.error("Done!")

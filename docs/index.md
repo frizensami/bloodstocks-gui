@@ -45,19 +45,19 @@ toc: false
 </style>
 
 <div class="hero">
-  <h1>Singapore Blood Stocks Graph</h1>
+  <h1>Singapore Blood Stocks Tracker</h1>
+  <h2> See <a href="https://sriramsami.com/bloodstocks/" target="_blank">this blog post</a> for more details on the methodology of this data. </h2>
 </div>
 
 
 ```js
-let orig_data = await FileAttachment("./data/bloodstocks.json").json();
+let orig_data = await FileAttachment("./data/blood.json").json();
 const data = orig_data.map((d) => ({...d, date: new Date(d.date)}));
-display(data);
-// display(penguins)
+// display(data);
 
 function bloodstocks(data, {width} = {}) {
   return Plot.plot({
-    title: "Singapore Blood Stock Amount",
+    title: "Singapore Blood Stock Amounts",
     width,
     height: 300,
     grid: true,
@@ -66,18 +66,16 @@ function bloodstocks(data, {width} = {}) {
     color: {legend: true},
     marks: [
         Plot.line(data, {x: "date", y: "fillLevel", stroke: "bloodType", tip: true}),
-      // Plot.rectY(data, Plot.binX({y: "count"}, {x: "date", fill: "state", interval: "year", tip: true})),
-      // Plot.ruleY([0])
     ]
   });
 }
 display(bloodstocks(data, {width}))
 ```
 
-<div class="grid grid-cols-1" style="grid-auto-rows: 504px;">
+<!-- <div class="grid grid-cols-1" style="grid-auto-rows: 504px;">
   <div class="card">${
     resize((width) => Plot.plot({
-      title: "Singapore Blood Stock Amounts",
+      title: "Singapore Blood Stock Tracker",
       width,
       grid: true,
       x: {label: "Date"},
@@ -89,6 +87,6 @@ display(bloodstocks(data, {width}))
       ]
     }))
   }</div>
-</div>
+</div> -->
 
 ---
